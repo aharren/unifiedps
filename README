@@ -1,0 +1,329 @@
+unifiedps 1.3.1                                                   2010-02-14
+
+NAME
+     unifiedps -- a unified, cross-platform process status
+
+SYNOPSIS
+     unifiedps [-<user-defined-option> [<argument1> [<argument2> ...]]]
+               [--display-format <format>]
+               [--display-indent <field>]
+               [--no-display-indent <field>]
+               [--display-header]
+               [--no-display-header]
+               [--display-width <width>]
+               [--mark <field> <operator> <value> [or ...]]
+               [--no-mark <field>]
+               [--restrict <field> <operator> <value> [or ...]]
+               [--no-restrict <field>]
+               [--include <relation>]
+               [--no-include <relation>]
+               [--platform <platform>]
+               [--stdin]
+               [--version]
+
+DESCRIPTION
+     Unifiedps displays information about running processes by wrapping and
+     decorating the platform's native ps command in a unified way across
+     different platforms, e.g. Mac OS X/Darwin, Linux, AIX, and HP-UX.
+
+     As unifiedps supports multiple platforms, it displays only a selection
+     of information about the processes which is available on all supported
+     platforms. Currently, for each process, the process' id, the parent
+     process' id, the user's name, the name of the controlling terminal, the
+     process' cpu time, and the associated command and arguments will be
+     shown.
+
+     Unifiedps has a set of built-in options which do not correspond to the
+     options of any platform's native ps command. All these built-in options
+     start with two dashes. Additionally, unifiedps provides a small macro
+     processor for defining user-defined options which may reflect options
+     of a native ps command. User-defined options start with a single dash.
+
+     Built-in options:
+
+     --display-format <format>
+          Selects the format to use for displaying the processes.
+
+          Possible formats are list and tree. list selects a simple list
+          format, while tree selects a format which displays a process'
+          child processes in a tree-structured, hierarchical way.
+
+          By default, the tree format is used.
+
+     --display-indent <field>
+          Indents the information of the given <field> according to the
+          process' hierarchy. A <field>'s indentation-width is increased by
+          one whitespace for each specified --display-indent option.
+
+          Available <field>s are command and pid.
+
+          This option is considerd by the tree display format only.
+
+     --no-display-indent <field>
+          Removes the indentation for the specified <field>. The <field>
+          value all removes indentations for all fields.
+
+     --display-header
+     --no-display-header
+          Does/Doesn't display a header line.
+
+     --display-width <width>
+          Specifies the number of columns to use for formatting the output.
+
+          If -1 is specified as the <width>, unifiedps will use as many
+          columns as necessary to display the processes' information.
+
+          By default, the current window's width is used for formatting the
+          output. The environment variable <COLUMNS> is used to determine
+          the window's width. If this variable is not defined, 80 columns
+          will be used.
+
+     --mark <field> <operator> <value> [or <operator> <value> [or ...]]
+          Marks all displayed processes which match the given criteria. If
+          the --mark option is specified more than once then the criteria
+          from all --mark options will be and'ed.
+
+          Available <field>s are command, pid, tty, and user.
+
+          Valid <operator>s are equals, contains, starts, ends and their
+          negating counterparts nequals, ncontains, nstarts, and nends.
+          Operators can be abbreviated with at least the first two
+          characters, e.g. eq or co, and at least the first three characters
+          for negating operators, e.g. neq or nco.
+
+          The special <operator>s is and nis map to contains and ncontains
+          for the command <field> and to equals and nequals for all other
+          <field>s.
+
+          For the tty <field>, no-tty is a special <value> for specifying
+          that a controlling terminal does not exist.
+
+          By default, the displayed processes of the current user are
+          marked. This corresponds to specifying --mark user eq $USER on the
+          command line.
+
+     --no-mark <field>
+          Removes all previously specified mark criteria for the given
+          <field>. The <field> value all can be used to remove the mark
+          criteria for all fields.
+
+     --restrict <field> <operator> <value> [or <operator> <value> [or ...]]
+          Restricts the displayed processes by the specified restriction
+          criteria.
+
+          The format of the option's arguments is equal to those of the
+          --mark option.
+
+          By default, only processes which belong to the current user and
+          which are connected to a controlling terminal are displayed.
+
+     --no-restrict <criterion>
+          Removes all previously specified restriction criteria.
+
+          The format of the option's arguments is equal to those of the
+          --no-mark option.
+
+     --include <relation>
+          Includes all processes for display which are in the given
+          <relation> to the selected processes.
+
+          Possible <relation>s are parents and children.
+
+          Includes are processed after restrictions, but includes qualify
+          for marking.
+
+     --no-include <relation>
+          Removes all previously specified includes for the given type of
+          <relation>. Use the special <relation> all to remove all includes.
+
+     --platform <platform>
+          Skips the auto-detection of the current platform and uses the
+          supplied <platform> instead.
+
+          Supported <platform>s are aix, darwin, freebsd, hpux, i5ospase,
+          linux, macosx, and solaris.
+
+     --stdin
+          Reads the process list from STDIN instead of calling the
+          platform's native ps command.
+
+     --version
+          Prints unifiedps' version information and exits.
+
+     User-defined options:
+
+     -<user-defined-option> [<argument1> [<argument2> ...]]
+          Expands the user-defined option as defined in the user-specific
+          configuration file ~/.unifiedpsrc.
+
+          A definition of a user-defined option has the following format
+          which must be specified within a single line:
+
+          -<name> [<argument-names>] := <definition>
+
+          where <name> is the name of the user-defined option,
+          <argument-names> is an optional, whitespace-separated list of the
+          option's argument names, and <definition> is the definition to
+          which the option will be expanded by the macro processor. In the
+          <definition>, an argument name 'a' can be referenced via '${a}'.
+          During macro expansion, all argument names will be replaced by the
+          concrete arguments which were specified at the command line.
+
+          A user-defined option '-u <user>' which restricts the displayed
+          processes to those which belong to the specified user can be
+          defined as follows:
+
+          -u user := --no-restrict user --restrict user eq ${user}
+
+          A line which starts with a '#' is considered as a comment. All
+          contigous comments in front of a user-defined option's definition
+          are considered as the option's documentation.
+
+     User-defined options configured in the packaged .unifiedpsrc file:
+
+     -a
+     --no-restrict user
+          Displays information about the processes of all users.
+
+     -aa
+     --no-restrict user --include parents --include children
+          Displays information about the processes of all users. Includes
+          all parent and child processes.
+
+     -A
+     --no-restrict user --no-restrict tty
+          Displays information about the processes of all users, even those
+          which are not connected to a controlling terminal.
+
+     -AA
+     --no-restrict user --no-restrict tty --include parents --include
+     children
+          Displays information about the processes of all users, even those
+          which are not connected to a controlling terminal. Includes all
+          parent and child processes
+
+     -AAx
+     --no-restrict user --no-restrict tty --include parents --include
+     children --restrict user neq root --restrict user neq nobody --restrict
+     user neq daemon --restrict user nst _
+          Displays information about the processes of all users, even those
+          which are not connected to a controlling terminal, but not those
+          which belong to root, nobody, daemon, and those users starting
+          with a '_'. Includes all parent and child processes
+
+     -ax
+     --no-restrict user --restrict user neq root --restrict user neq nobody
+     --restrict user neq daemon --restrict user nst _
+          Displays information about the processes of all users, but not
+          those which belong to root, nobody, daemon, and those users
+          starting with a '_'.
+
+     -aax
+     --no-restrict user --include parents --include children --restrict user
+     neq root --restrict user neq nobody --restrict user neq daemon
+     --restrict user nst _
+          Displays information about the processes of all users, but not
+          those which belong to root, nobody, daemon, and those users
+          starting with a '_'. Includes all parent and child processes.
+
+     -c <command>
+     --no-restrict command --restrict command nstarts unifiedps --restrict
+     command is <command>
+          Displays information about the processes which contain the
+          specified keyword in their command line. Excludes unifiedps from
+          the set of displayed processes.
+
+     -u <user>
+     --no-restrict user --restrict user equals <user>
+          Displays only information about those processes which belong to
+          the specified user.
+
+     -t
+     --display-format tree --no-display-indent all --display-indent pid
+     --display-indent command --display-indent command
+          Uses the tree-structured display format and indents the pid and
+          the command field
+
+     -f
+     --display-format tree --no-display-indent all --display-indent command
+     --display-indent command
+          Uses the tree-structured display format and indents only the
+          command field
+
+     -l
+     --display-format list
+          Uses the list-like display format.
+
+     -w
+     --display-width 132
+          Uses 132 columns to display information, instead of the default
+          display width.
+
+     -ww
+     --display-width -1
+          Uses as many columns as necessary for displaying the processes'
+          information.
+
+     -x
+     --no-restrict tty
+          Also displays information about processes which are not connected
+          to a controlling terminal.
+
+     -p
+     --no-display-header
+          Displays only the processes and no header line
+
+     -s
+     --restrict command nstarts unifiedps
+          Excludes unifiedps from the set of displayed processes
+
+     -h
+     --help
+          Displays the help text.
+
+     -v
+     --version
+          Shows the version information and exits.
+
+SUPPORTED PLATFORMS
+     AIX
+     Darwin
+     FreeBSD
+     HP-UX
+     i5/OS PASE
+     Linux
+     Mac OS X
+     Solaris
+
+RELEASES AND BUGS
+     The latest release of unifiedps is always available from its web site
+     at <http://0xc0.de/unifiedps>.
+
+     Please report bugs and feature requests to <unifiedps-bugs@0xc0.de>
+
+AUTHOR
+     Arne Harren <ah@0xc0.de>.
+
+COPYRIGHT AND LICENSE
+     Copyright 2005-2010 by Arne Harren <ah@0xc0.de>.
+
+     Permission is hereby granted, free of charge, to any person obtaining a
+     copy of this software and associated documentation files (the
+     Software), to deal in the Software without restriction, including
+     without limitation the rights to use, copy, modify, merge, publish,
+     distribute, sublicense, and/or sell copies of the Software, and to
+     permit persons to whom the Software is furnished to do so, subject to
+     the following conditions:
+
+     The above copyright notice and this permission notice shall be included
+     in all copies or substantial portions of the Software.
+
+     THE SOFTWARE IS PROVIDED AS IS, WITHOUT WARRANTY OF ANY KIND, EXPRESS
+     OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+     MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+     IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+     CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+     TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+     SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+unifiedps 1.3.1                                                   2010-02-14
