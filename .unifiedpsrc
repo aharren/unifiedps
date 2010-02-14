@@ -1,0 +1,94 @@
+#unifiedps
+#
+# .unifiedpsrc -- unifiedps resource file for user-defined options
+#
+# $id: //480a23d7-0537-489d-aaa2-643271c5bafd/1.2/src/.unifiedpsrc#20080210T182440Z-13$
+#
+# Copyright 2005-2008 by Arne Harren <ah@0xc0.de>.
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+#
+# -----------------------------------------------------------------------------
+
+
+# Displays information about the processes of all users.
+-a := --no-restrict user
+
+# Displays information about the processes of all users.
+# Includes all parent and child processes.
+-aa := --no-restrict user --include parents --include children
+
+# Displays information about the processes of all users, even those which are
+# not connected to a controlling terminal.
+-A := --no-restrict user --no-restrict tty
+
+# Displays information about the processes of all users, even those which are
+# not connected to a controlling terminal.
+# Includes all parent and child processes
+-AA := --no-restrict user --no-restrict tty --include parents --include children
+
+# Displays information about the processes of all users, but not those which
+# belong to root, nobody, daemon, and those users starting with a '_'.
+-ax := --no-restrict user --restrict user neq root --restrict user neq nobody --restrict user neq daemon --restrict user nst _
+
+# Displays information about the processes of all users, but not those which
+# belong to root, nobody, daemon, and those users starting with a '_'.
+# Includes all parent and child processes.
+-aax := --no-restrict user --include parents --include children --restrict user neq root --restrict user neq nobody --restrict user neq daemon --restrict user nst _
+
+# Displays information about the processes which contain the specified
+# keyword in their command line.
+# Excludes unifiedps from the set of displayed processes.
+-c command := --no-restrict command --restrict command nstarts unifiedps --restrict command is ${command}
+
+# Displays only information about those processes which belong to the 
+# specified user.
+-u user := --no-restrict user --restrict user equals ${user}
+
+# Uses the tree-structured display format and indents the pid and the command field
+-t := --display-format tree --no-display-indent all --display-indent pid --display-indent command --display-indent command
+
+# Uses the tree-structured display format and indents only the command field
+-f := --display-format tree --no-display-indent all --display-indent command --display-indent command
+
+# Uses the list-like display format.
+-l := --display-format list
+
+# Uses 132 columns to display information, instead of the default display
+# width.
+-w := --display-width 132
+
+# Uses as many columns as necessary for displaying the processes' information.
+-ww := --display-width -1
+
+# Also displays information about processes which are not connected to
+# a controlling terminal.
+-x := --no-restrict tty
+
+# Displays only the processes and no header line
+-p := --no-display-header
+
+# Excludes unifiedps from the set of displayed processes
+-s := --restrict command nstarts unifiedps
+
+# Displays the help text.
+-h := --help
+
+# Shows the version information and exits.
+-v := --version

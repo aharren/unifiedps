@@ -1,0 +1,2262 @@
+#!/usr/bin/perl
+#
+# unifiedps -- unified process status
+#
+my $scid= '$id: //480a23d7-0537-489d-aaa2-643271c5bafd/1.2/src/unifiedps#20080210T181413Z-46$';
+#
+# Copyright 2005-2008 by Arne Harren <ah@0xc0.de>.
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+#
+# -----------------------------------------------------------------------------
+
+use strict;
+use warnings;
+use 5.8.0;
+
+# -----------------------------------------------------------------------------
+
+# version is major plus minor from path, plus file's revision number 
+$scid =~ /\/([0-9]+)\.([0-9]+)\/.*#.*Z-([0-9]+)\$/;
+my $unifiedps_version= "$1.$2.$3";
+
+# date is date from file's revision
+$scid =~ /#([0-9]{4})([0-9]{2})([0-9]{2})/;
+my $unifiedps_date= "$1-$2-$3";
+
+# -----------------------------------------------------------------------------
+
+# inline pod documentation
+my $unifiedps_pod= <<END;
+
+=head1 NAME
+
+B<unifiedps> -- unified process status
+
+=head1 SYNOPSIS
+
+B<unifiedps> [B<->I<user-defined-option> [I<argument1> [I<argument2> ...]]]
+
+[>>>[B<--display-format> I<format>]
+
+[>>>[B<--display-indent> I<field>]
+
+[>>>[B<--no-display-indent> I<field>]
+
+[>>>[B<--display-header>]
+
+[>>>[B<--no-display-header>]
+
+[>>>[B<--display-width> I<width>]
+
+[>>>[B<--mark> I<field> I<operator> I<value> [B<or> I<operator> I<value> [B<or> ...]]]
+
+[>>>[B<--no-mark> I<field>]
+
+[>>>[B<--restrict> I<field> I<operator> I<value> [B<or> I<operator> I<value> [B<or> ...]]]
+
+[>>>[B<--no-restrict> I<field>]
+
+[>>>[B<--include> I<relation>]
+
+[>>>[B<--no-include> I<relation>]
+
+[>>>[B<--platform> I<platform>]
+
+[>>>[B<--stdin>]
+
+[>>>[B<--version>]
+
+=head1 DESCRIPTION
+
+B<Unifiedps> displays information about running processes by wrapping and 
+decorating the platform's native B<ps> command in an unified way across 
+different platforms, e.g. Mac OS X/Darwin, Linux, AIX, and HP-UX.
+
+As B<unifiedps> supports multiple platforms, it displays only a selection of
+information about the processes which is available on all supported platforms.
+Currently, for each process, the process' id, the parent process' id, the 
+user's name, the name of the controlling terminal, the process' cpu time, and 
+the associated command and arguments will be shown.
+
+B<Unifiedps> has a set of built-in options which do not correspond to the
+options of any platform's native B<ps> command. All these built-in options
+start with two dashes. Additionally, B<unifiedps> provides a small macro 
+processor for defining user-defined options which may reflect options of a
+native B<ps> command. User-defined options start with a single dash.
+
+Built-in options:
+
+=over 5
+
+=item B<--display-format> I<format>
+
+Selects the format to use for displaying the processes.
+
+Possible formats are B<list> and B<tree>. B<list> selects a simple list format,
+while B<tree> selects a format which displays a process' child processes in a
+tree-structured, hierarchical way.  
+
+By default, the B<tree> format is used.
+
+=item B<--display-indent> I<field>
+
+Indents the information of the given I<field> according to the process'
+hierarchy. A I<field>'s indentation-width is increased by one whitespace for
+each specified B<--display-indent> option.
+
+Available I<field>s are B<command> and B<pid>.
+
+This option is considerd by the B<tree> display format only.
+
+=item B<--no-display-indent> I<field>
+
+Removes the indentation for the specified I<field>. The I<field> value B<all>
+removes indentations for all fields.
+
+=item B<--display-header>
+
+=item B<--no-display-header>
+
+Does/Doesn't display a header line.
+
+=item B<--display-width> I<width>
+
+Specifies the number of columns to use for formatting the output.
+
+If B<-1> is specified as the I<width>, B<unifiedps> will use as many columns as
+necessary to display the processes' information.
+
+By default, the current window's width is used for formatting the output. The
+environment variable I<COLUMNS> is used to determine the window's width. If
+this variable is not defined, 80 columns will be used.
+
+=item B<--mark> I<field> I<operator> I<value> [B<or> I<operator> I<value> [B<or> ...]]
+
+Marks all displayed processes which match the given criteria. If the B<--mark>
+option is specified more than once then the criteria from all B<--mark> options
+will be and'ed.
+
+Available I<field>s are B<command>, B<pid>, B<tty>, and B<user>.
+
+Valid I<operator>s are B<equals>, B<contains>, B<starts>, B<ends> and their
+negating counterparts B<nequals>, B<ncontains>, B<nstarts>, and B<nends>.
+Operators can be abbreviated with at least the first two characters, e.g. B<eq>
+or B<co>, and at least the first three characters for negating operators, e.g.
+B<neq> or B<nco>.
+
+The special I<operator>s B<is> and B<nis> map to B<contains> and B<ncontains>
+for the B<command> I<field> and to B<equals> and B<nequals> for all other
+I<field>s.
+
+For the B<tty> I<field>, B<no-tty> is a special I<value> for specifying that a
+controlling terminal does not exist.
+
+By default, the displayed processes of the current user are marked. This
+corresponds to specifying B<--mark user eq \$USER> on the command line.
+
+=item B<--no-mark> I<field> 
+
+Removes all previously specified mark criteria for the given I<field>. The
+I<field> value B<all> can be used to remove the mark criteria for all fields.
+
+=item B<--restrict> I<field> I<operator> I<value> [B<or> I<operator> I<value> [B<or> ...]]
+
+Restricts the displayed processes by the specified restriction criteria.
+
+The format of the option's arguments is equal to those of the B<--mark> option.
+
+By default, only processes which belong to the current user and which are 
+connected to a controlling terminal are displayed.
+
+=item B<--no-restrict> I<criterion>
+
+Removes all previously specified restriction criteria.
+
+The format of the option's arguments is equal to those of the B<--no-mark>
+option.
+
+=item B<--include> I<relation>
+
+Includes all processes for display which are in the given I<relation> to the
+selected processes.
+
+Possible I<relation>s are B<parents> and B<children>.
+
+Includes are processed after restrictions, but includes qualify for marking.
+
+=item B<--no-include> I<relation>
+
+Removes all previously specified includes for the given type of I<relation>.
+Use the special I<relation> B<all> to remove all includes.
+
+=item B<--platform> I<platform>
+
+Skips the auto-detection of the current platform and uses the supplied
+I<platform> instead.
+
+Supported I<platform>s are B<aix>, B<darwin>, B<freebsd>, B<hpux>, B<i5ospase>,
+B<linux>, B<macosx>, and B<solaris>.
+
+=item B<--stdin>
+
+Reads the process list from STDIN instead of calling the platform's native
+B<ps> command.
+
+=item B<--version>
+
+Prints B<unifiedps>' version information and exits.
+
+=back
+
+User-defined options:
+
+=over 5
+
+=item B<->I<user-defined-option> [I<argument1> [I<argument2> ...]]
+
+Expands the user-defined option as defined in the user-specific configuration
+file B<~/.unifiedpsrc>.
+
+A definition of a user-defined option has the following format which must
+be specified within a single line:
+
+B<->I<name> [I<argument-names>] B<:=> I<definition>
+
+where I<name> is the name of the user-defined option, I<argument-names> is an
+optional, whitespace-separated list of the option's argument names, and 
+I<definition> is the definition to which the option will be expanded by the
+macro processor. In the I<definition>, an argument name 'a' can be referenced
+via '\${a}'. During macro expansion, all argument names will be replaced by the
+concrete arguments which were specified at the command line.
+
+A user-defined option '-B<u> I<user>' which restricts the displayed processes
+to those which belong to the specified user can be defined as follows:
+
+B<-u user := --no-restrict user --restrict user eq \${user}>
+
+A line which starts with a '#' is considered as a comment. All contigous
+comments in front of a user-defined option's definition are considered as
+the option's documentation.
+
+=back
+
+*
+
+=head1 SUPPORTED PLATFORMS
+
+=over 5
+
+=item AIX
+
+=item Darwin
+
+=item FreeBSD
+
+=item HP-UX
+
+=item i5/OS PASE
+
+=item Linux 
+
+=item Mac OS X
+
+=item Solaris
+
+=back 
+
+=head1 RELEASES AND BUGS
+
+The latest release of B<unifiedps> is always available from its web site at
+L<http://0xc0.de/unifiedps>.
+
+Please report bugs and feature requests to 
+<L<unifiedps-bugs\@0xc0.de|mailto:unifiedps-bugs\@0xc0.de>>
+
+=head1 AUTHOR
+
+Arne Harren <L<ah\@0xc0.de|mailto:ah\@0xc0.de>>.
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2005-2008 by Arne Harren <L<ah\@0xc0.de|mailto:ah\@0xc0.de>>.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+END
+
+# -----------------------------------------------------------------------------
+
+package UnifiedPS::Matchers::Equals; {
+
+  sub new_instance {
+    my ($class, $value)= @_;
+    # --
+
+    my $self= {     
+      _value => $value
+    };
+    bless $self, $class;
+
+    return $self;	
+  }
+
+  sub matches {
+    my ($self, $value)= @_;
+
+    return $self->{_value} eq "$value";
+  }
+
+}
+
+package UnifiedPS::Matchers::Contains; {
+
+  sub new_instance {
+    my ($class, $value)= @_;
+    # --
+
+    my $self= {     
+      _value => quotemeta($value)
+    };
+    bless $self, $class;
+
+    return $self;	
+  }
+
+  sub matches {
+    my ($self, $value)= @_;
+
+    return $value =~ /$self->{_value}/i;
+  }
+
+}
+
+package UnifiedPS::Matchers::Starts; {
+
+  sub new_instance {
+    my ($class, $value)= @_;
+    # --
+
+    my $self= {     
+      _value => quotemeta($value)
+    };
+    bless $self, $class;
+
+    return $self;	
+  }
+
+  sub matches {
+    my ($self, $value)= @_;
+
+    return $value =~ /^$self->{_value}/i;
+  }
+
+}
+
+package UnifiedPS::Matchers::Ends; {
+
+  sub new_instance {
+    my ($class, $value)= @_;
+    # --
+
+    my $self= {     
+      _value => quotemeta($value)
+    };
+    bless $self, $class;
+
+    return $self;	
+  }
+
+  sub matches {
+    my ($self, $value)= @_;
+    
+    return $value =~ /^$self->{_value}$/i;
+  }
+
+}
+
+package UnifiedPS::Matchers::Not; {
+  
+  sub new_instance {
+    my ($class, $matcher)= @_;
+    # --
+
+    my $self= {
+      _matcher => $matcher
+    };
+    bless $self, $class;
+    return $self;	
+  }
+
+  sub matches {
+    my ($self, $value)= @_;
+    
+    return !($self->{_matcher}->matches($value));
+  }
+
+}
+
+package UnifiedPS::Matchers::Or; {
+  
+  sub new_instance {
+    my ($class, $matcher1, $matcher2)= @_;
+    # --
+
+    my $self= {
+      _matcher1 => $matcher1,
+      _matcher2 => $matcher2
+    };
+    bless $self, $class;
+    return $self;	
+  }
+
+  sub matches {
+    my ($self, $value)= @_;
+    
+    return $self->{_matcher1}->matches($value) ||
+           $self->{_matcher2}->matches($value);
+  }
+
+}
+
+package UnifiedPS::Matchers::And; {
+  
+  sub new_instance {
+    my ($class, $matcher1, $matcher2)= @_;
+    # --
+
+    my $self= {
+      _matcher1 => $matcher1,
+      _matcher2 => $matcher2
+    };
+    bless $self, $class;
+    return $self;	
+  }
+
+  sub matches {
+    my ($self, $value)= @_;
+    
+    return $self->{_matcher1}->matches($value) &&
+           $self->{_matcher2}->matches($value);
+  }
+
+}
+
+package UnifiedPS::Matchers; {
+  
+  sub equals {
+    my ($value)= @_;
+    # --
+
+    return UnifiedPS::Matchers::Equals->new_instance($value);
+  }
+
+  sub contains {
+    my ($value)= @_;
+    # --
+
+    return UnifiedPS::Matchers::Contains->new_instance($value);
+  }
+
+  sub starts {
+    my ($value)= @_;
+    # --
+
+    return UnifiedPS::Matchers::Starts->new_instance($value);
+  }
+
+  sub ends {
+    my ($value)= @_;
+    # --
+
+    return UnifiedPS::Matchers::Ends->new_instance($value);
+  }
+
+  sub not {
+    my ($matcher)= @_;
+    # --
+
+    return UnifiedPS::Matchers::Not->new_instance($matcher);
+  }
+
+  sub and {
+    my ($matcher1, $matcher2)= @_;
+    # --
+
+    return UnifiedPS::Matchers::And->new_instance($matcher1, $matcher2);
+  }
+
+  sub or {
+    my ($matcher1, $matcher2)= @_;
+    # --
+
+    return UnifiedPS::Matchers::Or->new_instance($matcher1, $matcher2);
+  }
+
+}
+
+# -----------------------------------------------------------------------------
+
+package UnifiedPS::Options; {
+
+  sub new_instance {
+    # creates a new Options instance
+    my ($class)= @_;
+    # --
+
+    # create new instance and set defaults
+    my $self= {};
+    bless $self, $class;
+    $self->set_defaults();
+
+    # return new instance
+    return $self;	
+  }
+
+  my $option_display_format						= "--display-format";
+  my $option_display_indent 					= "--display-indent";
+  my $option_no_display_indent 				= "--no-display-indent";
+  my $option_display_header 					= "--display-header";
+  my $option_no_display_header 				= "--no-display-header";
+  my $option_display_width  					= "--display-width";
+  my $option_mark           					= "--mark";
+  my $option_no_mark        					= "--no-mark";
+  my $option_restrict       					= "--restrict";
+  my $option_no_restrict    					= "--no-restrict";
+  my $option_include        					= "--include";
+  my $option_no_include     					= "--no-include";
+  my $option_platform       					= "--platform";
+  my $option_stdin          					= "--stdin";
+  my $option_version        					= "--version";
+  my $option_help           					= "--help";
+
+  my $display_format_tree   					= "tree";
+  my $display_format_list   					= "list";
+
+  my $field_command         					= "command";
+  my $field_pid             					= "pid";
+  my $field_tty             					= "tty";
+  my $field_user            					= "user";
+  my $field_all             					= "all";
+
+  my $value_no_tty          					= "no-tty";
+
+  my $operator_equals       					= [ "eq"  , "equals"    ];
+  my $operator_not_equals   					= [ "neq" , "nequals"   ];
+  my $operator_contains     					= [ "co"  , "contains"  ];
+  my $operator_not_contains 					= [ "nco" , "ncontains" ];
+  my $operator_is           					= [ "is"  , "is"        ];
+  my $operator_not_is       					= [ "nis" , "nis"       ];
+  my $operator_starts       					= [ "st"  , "starts"    ];
+  my $operator_not_starts   					= [ "nst" , "nstarts"   ];
+  my $operator_ends         					= [ "en"  , "ends"      ];
+  my $operator_not_ends     					= [ "nen" , "nends"     ];
+  my $operator_or           					= [ "or"  , "or"        ];
+
+  my $relation_parents      					= "parents";
+  my $relation_children     					= "children";
+  my $relation_all          					= "all";
+
+  my $error_value           					= "__error__";
+
+  sub operator {
+    my (%args)= @_;
+    
+    return $args{pattern}->[1];
+  }
+
+  sub operator_matches {
+    my (%args)= @_;
+
+    my $value= $args{value};
+    my $pattern= $args{pattern};
+
+    if ($value =~ /^$pattern->[0]/) {
+      my $regex= quotemeta($value);
+      return $pattern->[1] =~ /^$regex/;
+    }
+    return 0;
+  }
+
+  sub set_defaults {
+    # sets default values for this Options instance
+    my ($self)= @_;
+    # --
+
+    # use tree format and window's width
+    $self->{_display_format}= $display_format_tree;
+    $self->{_display_width}= $ENV{COLUMNS} ? $ENV{COLUMNS} : 80;
+
+    # mark current user
+    $self->{_mark_command}= [];
+    $self->{_mark_pid}= [];
+    $self->{_mark_tty}= [];
+    $self->{_mark_user}= $ENV{USER} ? [ UnifiedPS::Matchers::equals($ENV{USER}) ] : [];
+
+    # restrict to processes with controlling terminals and to current user 
+    $self->{_restrict_command}= [];
+    $self->{_restrict_pid}= [];
+    $self->{_restrict_tty}= [ UnifiedPS::Matchers::not(UnifiedPS::Matchers::equals($value_no_tty)) ];
+    $self->{_restrict_user}= $ENV{USER} ? [ UnifiedPS::Matchers::equals($ENV{USER}) ] : [];
+
+    # display indents
+    $self->{_display_indent_pid}= 1;
+    $self->{_display_indent_command}= 2;
+
+		# display header
+		$self->{_display_header}= 1;
+
+    # includes
+    $self->{_include_parents}= 0;
+    $self->{_include_children}= 0;
+
+    # auto-detect the platform
+    $self->{_platform}= "auto-detect";
+    
+    # don't read the process list from std-in.
+    $self->{_stdin}= 0;
+  }
+
+  sub get_display_format {
+    # returns the display format
+    my ($self)= @_;
+    # --
+
+    return $self->{_display_format};
+  }
+
+  sub get_display_width {
+    # returns the display width
+    my ($self)= @_;
+    # --
+
+    return $self->{_display_width};
+  }
+
+  sub get_mark_command {
+    # returns the mark command array
+    my ($self)= @_;
+    # --
+
+    return $self->{_mark_command};
+  }
+
+  sub get_mark_pid {
+    # returns the mark pid array
+    my ($self)= @_;
+    # --
+
+    return $self->{_mark_pid};
+  }
+
+  sub get_mark_tty {
+    # returns the mark tty array
+    my ($self)= @_;
+    # --
+
+    return $self->{_mark_tty};
+  }
+
+  sub get_mark_user {
+    # returns the mark user array
+    my ($self)= @_;
+    # --
+
+    return $self->{_mark_user};
+  }
+
+  sub get_restrict_command {
+    # returns the restrict command array
+    my ($self)= @_;
+    # --
+
+    return $self->{_restrict_command};
+  }
+
+  sub get_restrict_pid {
+    # returns the restrict pid array
+    my ($self)= @_;
+    # --
+
+    return $self->{_restrict_pid};
+  }
+
+  sub get_restrict_tty {
+    # returns the restrict tty array
+    my ($self)= @_;
+    # --
+
+    return $self->{_restrict_tty};
+  }
+
+  sub get_restrict_user {
+    # returns the restrict user array
+    my ($self)= @_;
+    # --
+
+    return $self->{_restrict_user};
+  }
+
+  sub get_include_parents {
+    # returns the include for parents
+    my ($self)= @_;
+    # --
+
+    return $self->{_include_parents};
+  }
+
+  sub get_include_children {
+    # returns the include for children
+    my ($self)= @_;
+    # --
+
+    return $self->{_include_children};
+  }
+
+  sub get_display_indent_pid {
+    # returns the indent for pid
+    my ($self)= @_;
+    # --
+
+    return $self->{_display_indent_pid};
+  }
+
+  sub get_display_indent_command {
+    # returns the indent for command
+    my ($self)= @_;
+    # --
+
+    return $self->{_display_indent_command};
+  }
+
+  sub get_display_header {
+    # returns the display settings for the header line
+    my ($self)= @_;
+    # --
+
+    return $self->{_display_header};
+  }
+
+
+  sub get_platform {
+    # returns the platform
+    my ($self)= @_;
+    # --
+
+    return $self->{_platform};
+  }
+ 
+  sub get_stdin {
+    # returns the stdin parameter
+    my ($self)= @_;
+    # --
+
+    return $self->{_stdin};
+  }
+
+  sub print_documentation_external {
+    # prints the inline pod documentation with the given external tool;
+    # returns 1 on success and 0 on failure
+    my (%args)= @_;
+    # command           => the tool to use
+    # userdefpod        => user-defined options as pod text
+    # --
+
+    # get formatted pod documentation via external tool    
+    my $raw_pod= $unifiedps_pod;
+    my $userdefpod= $args{userdefpod};
+    $raw_pod=~ s/\*/$userdefpod/ if defined($userdefpod);
+    $raw_pod=~ s/\*\n\n// if !defined($userdefpod);
+    $raw_pod=~ s/\$/\\\$/g;
+    my @pod= `echo \"$raw_pod\" | $args{command} 2>&1`;
+    return 0 if @pod < 20;
+
+    # decorate the documentation with version information 
+    my $formatted_pod= "";
+    $formatted_pod.= sprintf("%-38s%38s", "unifiedps $unifiedps_version", $unifiedps_date);
+    $formatted_pod.= "\n\n";
+    $formatted_pod.= join("", @pod);
+    $formatted_pod.= sprintf("%-38s%38s", "unifiedps $unifiedps_version", $unifiedps_date);
+
+    # replace indentation place holders
+    $formatted_pod=~ s/\n\s*\[>>>/\n               /g;
+
+    # show documentation
+    $formatted_pod=~ s/\$/\\\$/g;
+    system "echo \"$formatted_pod\" | less";
+    return 1;
+  }
+
+  sub print_documentation {
+    # prints the inline pod documentaiton
+    my (%args)= @_;
+    # userdefoptions    => a UserDefinedOptions instance
+    # --
+
+    my $userdefoptions= $args{userdefoptions};
+    my $userdefpod= $userdefoptions->to_pod();
+  
+    my $done;
+    # try pod2text with -o
+    $done= print_documentation_external(command => "pod2text -w76 -i 5 -o", userdefpod => $userdefpod);
+    # try pod2text again, without -o
+    $done= print_documentation_external(command => "pod2text -w76 -i 5", userdefpod => $userdefpod) if !$done;
+    # bail out
+    print "unifiedps: failed to display inline documentation\n" if !$done;
+  }
+
+  sub print_usage {
+    # prints the usage text
+    # --
+
+    print <<END;
+usage: unifiedps [-<user-defined-option> [<argument1 [<argument2> ...]]]
+                 [--display-format <format>]
+                 [--display-indent <field>]
+                 [--no-display-indent <field>]
+                 [--display-header]
+                 [--no-display-header]
+                 [--display-width <width>]
+                 [--mark <field> <operator> <value> [or <operator> <value> [or ...]]]
+                 [--no-mark <field>]
+                 [--restrict <field> <operator> <value> [or <operator> <value> [or ...]]]
+                 [--no-restrict <field>]
+                 [--include <relation>]
+                 [--no-include <relation>]
+                 [--platform <platform>]
+                 [--stdin]
+       unifiedps --version
+       unifiedps --help
+END
+  }
+
+  sub print_error_and_usage {
+    # prints an error message and the usage text
+    my (%args)= @_;
+    # error             => error description
+    # --
+
+    print "unifiedps: $args{error}\n";
+    print_usage();
+  }
+
+  sub get_argument {
+    # returns the argument at the given index, or $error_value if the 
+    # argument doesn't exist
+    my (%args)= @_;
+    # arguments         => a reference to the arguments array
+    # index             => argument index
+    # --
+
+    my $arguments= $args{arguments};
+    my $index= $args{index};
+    return $error_value if ($index >= @$arguments);
+    return $arguments->[$index];
+  }
+
+  sub process_arguments {
+    # processes the program's command line arguments and initializes this
+    # Options instance; returns 1 on success and 0 on failure, or the given
+    # silentrvalue if the documentation was printed
+    my ($self, %args)= @_;
+    # arguments         => a reference to the arguments array
+    # userdefoptions    => a UserDefinedOptions instance
+    # [processuserdef]  => whether to process user-defined options
+    # [silent]          => be silent
+    # [silentrvalue]    => return value to use if the documentation was printed
+    # --
+
+    my $arguments= $args{arguments};
+    my $silent= $args{silent};
+    my $userdefoptions= $args{userdefoptions};
+    my $processuserdef= defined($args{processuserdef}) ? $args{processuserdef} : defined($userdefoptions);
+    my $silentrvalue= defined($args{silentrvalue}) ? $args{silentrvalue} : 0;
+
+    my $argument_index= 0;
+    while ($argument_index < @$arguments) {
+      my $option= $arguments->[$argument_index];
+      my $handled= 0;
+      
+      if      ($option eq $option_help) { 
+        print_documentation(userdefoptions => $userdefoptions);
+        return $silentrvalue;
+      } elsif ($option eq $option_display_format) {
+        my $format= get_argument(arguments => $arguments, index => ++$argument_index);
+        if      ($format eq $error_value) {
+          print_error_and_usage(error => "missing parameter 'format' for option '$option'") unless $silent;
+          return 0;
+        } elsif ($format eq $display_format_tree || 
+                 $format eq $display_format_list) {
+          # set format
+          $self->{_display_format}= $format;
+        } else {
+          print_error_and_usage(error => "unsupported format '$format' for option '$option'") unless $silent;
+          return 0;
+        }
+        $handled= 1;
+      } elsif ($option eq $option_display_width)  {
+        my $width= get_argument(arguments => $arguments, index => ++$argument_index);
+        if      ($width eq $error_value) {
+          print_error_and_usage(error => "missing parameter 'width' for option '$option'") unless $silent;
+          return 0;
+        } elsif ($width eq "-1") {
+          # set width to -1
+          $self->{_display_width}= -1;
+        } elsif ($width =~ /^[0-9]+$/ && ($width - 0) >= 0) {
+          # set width
+          $self->{_display_width}= ($width - 0);
+        } else {
+          print_error_and_usage(error => "unsupported width '$width' for option '$option'") unless $silent;
+          return 0;
+        }
+        $handled= 1;
+      } elsif ($option eq $option_mark ||
+               $option eq $option_restrict)  {
+        my $field= get_argument(arguments => $arguments, index => ++$argument_index);
+        if      ($field eq $error_value) {
+          print_error_and_usage(error => "missing parameter 'field' for option '$option'") unless $silent;
+          return 0;
+        } elsif ($field ne $field_command &&
+                 $field ne $field_pid && 
+                 $field ne $field_tty && 
+                 $field ne $field_user) {
+          print_error_and_usage(error => "unsupported field '$field' for option '$option'") unless $silent;
+          return 0;
+        }          
+
+        my $arg= $option;
+        $arg=~ s/--//;
+        my $list= $self->{"_${arg}_$field"};
+        my $matcher= 0;
+        my $has_more= 1;
+        while ($has_more) {
+          my $operator= get_argument(arguments => $arguments, index => ++$argument_index);
+          my $value=    get_argument(arguments => $arguments, index => ++$argument_index);
+
+          if ($operator eq $error_value) {
+            print_error_and_usage(error => "missing parameter 'operator' for option '$option'");
+            return 0;
+          } elsif ($value eq $error_value) {
+            print_error_and_usage(error => "missing parameter 'value' for option '$option'");
+            return 0;
+          } else {
+            if      (operator_matches(value => $operator, pattern => $operator_is)) {
+              $operator= $field eq $field_command ? $operator_contains : $operator_equals;
+              $operator= operator(pattern => $operator);
+            } elsif (operator_matches(value => $operator, pattern => $operator_not_is)) {
+              $operator= $field eq $field_command ? $operator_not_contains : $operator_not_equals;
+              $operator= operator(pattern => $operator);
+            }
+
+            my $new_matcher;
+            if      (operator_matches(value => $operator, pattern => $operator_equals)) {
+              $new_matcher= UnifiedPS::Matchers::equals($value);
+            } elsif (operator_matches(value => $operator, pattern => $operator_not_equals)) {
+              $new_matcher= UnifiedPS::Matchers::not(UnifiedPS::Matchers::equals($value));
+            } elsif (operator_matches(value => $operator, pattern => $operator_contains)) {
+              $new_matcher= UnifiedPS::Matchers::contains($value);
+            } elsif (operator_matches(value => $operator, pattern => $operator_not_contains)) {
+              $new_matcher= UnifiedPS::Matchers::not(UnifiedPS::Matchers::contains($value));
+            } elsif (operator_matches(value => $operator, pattern => $operator_starts)) {
+              $new_matcher= UnifiedPS::Matchers::starts($value);
+            } elsif (operator_matches(value => $operator, pattern => $operator_not_starts)) {
+              $new_matcher= UnifiedPS::Matchers::not(UnifiedPS::Matchers::starts($value));
+            } elsif (operator_matches(value => $operator, pattern => $operator_ends)) {
+              $new_matcher= UnifiedPS::Matchers::ends($value);
+            } elsif (operator_matches(value => $operator, pattern => $operator_not_ends)) {
+              $new_matcher= UnifiedPS::Matchers::not(UnifiedPS::Matchers::ends($value));
+            } else {
+              print_error_and_usage(error => "unsupported operator '$operator' for option '$option'");
+              return 0;            
+            }
+
+            if ($matcher) {
+              $matcher= UnifiedPS::Matchers::or($matcher, $new_matcher);
+            } else {
+              $matcher= $new_matcher;
+            }
+          }
+
+          my $op= get_argument(arguments => $arguments, index => ++$argument_index);
+          $has_more= operator_matches(value => $op, pattern => $operator_or);
+        }
+        --$argument_index;
+        push(@$list, $matcher);
+        $handled= 1;
+      } elsif ($option eq $option_no_mark ||
+               $option eq $option_no_restrict)  {
+        my $arg= $option;
+        $arg=~ s/--no-//;
+        my $field= get_argument(arguments => $arguments, index => ++$argument_index);
+        if      ($field eq $error_value) {
+          print_error_and_usage(error => "missing parameter 'field' for option '$option'") unless $silent;
+          return 0;
+        } elsif ($field eq $field_command ||
+                 $field eq $field_pid || 
+                 $field eq $field_tty || 
+                 $field eq $field_user) {
+          # clear mark/restrict list for field
+          $self->{"_${arg}_$field"}= [];
+        } elsif ($field eq $field_all) {
+          # clear all mark/restrict lists
+          $self->{"_${arg}_command"}= [];
+          $self->{"_${arg}_pid"}= [];
+          $self->{"_${arg}_tty"}= [];
+          $self->{"_${arg}_user"}= [];
+        } else {
+          print_error_and_usage(error => "unsupported field '$field' for option '$option'") unless $silent;
+          return 0;
+        }
+        $handled= 1;
+      } elsif ($option eq $option_include) {
+        my $relation= get_argument(arguments => $arguments, index => ++$argument_index);
+        if      ($relation eq $error_value) {
+          print_error_and_usage(error => "missing parameter 'relation' for option '$option'") unless $silent;
+          return 0;          
+        } elsif ($relation eq $relation_parents) {
+          $self->{_include_parents}= 1;
+        } elsif ($relation eq $relation_children) {
+          $self->{_include_children}= 1;
+        } else {
+          print_error_and_usage(error => "unsupported relation '$relation' for option '$option'") unless $silent;
+          return 0;
+        }
+        $handled= 1;
+      } elsif ($option eq $option_no_include) {
+        my $relation= get_argument(arguments => $arguments, index => ++$argument_index);
+        if      ($relation eq $error_value) {
+          print_error_and_usage(error => "missing parameter 'relation' for option '$option'") unless $silent;
+          return 0;          
+        } elsif ($relation eq $relation_parents) {
+          $self->{_include_parents}= 0;
+        } elsif ($relation eq $relation_children) {
+          $self->{_include_children}= 0;
+        } elsif ($relation eq $relation_all) {
+          $self->{_include_parents}= 0;
+          $self->{_include_children}= 0;
+        } else {
+          print_error_and_usage(error => "unsupported relation '$relation' for option '$option'") unless $silent;
+          return 0;
+        }
+        $handled= 1;
+      } elsif ($option eq $option_display_indent) {
+        my $field= get_argument(arguments => $arguments, index => ++$argument_index);
+        if      ($field eq $error_value) {
+          print_error_and_usage(error => "missing parameter 'field' for option '$option'") unless $silent;
+          return 0;          
+        } elsif ($field eq $field_pid ||
+                 $field eq $field_command) {
+          $self->{"_display_indent_$field"}+= 1;
+        } else {
+          print_error_and_usage(error => "unsupported field '$field' for option '$option'") unless $silent;
+          return 0;
+        }
+        $handled= 1;
+      } elsif ($option eq $option_display_header) {
+        $self->{_display_header}= 1;
+        $handled= 1;
+      } elsif ($option eq $option_no_display_header) {
+        $self->{_display_header}= 0;
+        $handled= 1;
+      } elsif ($option eq $option_no_display_indent) {
+        my $field= get_argument(arguments => $arguments, index => ++$argument_index);
+        if      ($field eq $error_value) {
+          print_error_and_usage(error => "missing parameter 'field' for option '$option'") unless $silent;
+          return 0;          
+        } elsif ($field eq $field_pid ||
+                 $field eq $field_command) {
+          $self->{"_display_indent_$field"}= 0;
+        } elsif ($field eq $field_all) {
+          $self->{_display_indent_pid}= 0;
+          $self->{_display_indent_command}= 0;
+        } else {
+          print_error_and_usage(error => "unsupported field '$field' for option '$option'") unless $silent;
+          return 0;
+        }
+        $handled= 1;
+      } elsif ($option eq $option_platform)  {
+        my $platform= get_argument(arguments => $arguments, index => ++$argument_index);
+        if      ($platform eq $error_value) {
+          print_error_and_usage(error => "missing parameter 'platform' for option '$option'") unless $silent;
+          return 0;
+        } else {
+          # set platform
+          $self->{_platform}= $platform;
+        }
+        $handled= 1;
+      } elsif ($option eq $option_stdin)  {
+        # set stdin
+        $self->{_stdin}= 1;
+        $handled= 1;
+      } elsif ($option eq $option_version)  {
+        # print version information and return
+        print "$unifiedps_version\n";
+        return $silentrvalue;
+      } elsif ($processuserdef && $userdefoptions && $userdefoptions->matches(name => $option)) {
+        # handle user-defined option
+        my @udarguments= $userdefoptions->arguments(name => $option);
+        my @uddefinition= $userdefoptions->definition(name => $option);
+
+        # process arguments
+        foreach my $udargument (@udarguments) {
+          my $arg= get_argument(arguments => $arguments, index => ++$argument_index);
+          if ($arg eq $error_value) {
+            print_error_and_usage(error => "missing parameter '$udargument' for user-defined option '$option'")
+              unless $silent;
+          } else {
+            # replace occurences of the option in the definition
+            for (my $i= 0; $i< @uddefinition; $i++) {
+              $uddefinition[$i]=~ s/\$\{$udargument\}/$arg/;
+            }
+          }
+        }
+
+        # process the option
+        $handled= $self->process_arguments(arguments => \@uddefinition,
+                                           userdefoptions => $userdefoptions,
+                                           processuserdef => 0,
+                                           silent => 1,
+                                           silentrvalue => 2);
+        return 0 if ($handled == 2);
+                                           
+        if (!$handled) {
+          print_error_and_usage(error => "failed to process user-defined option '$option'") unless $silent;
+          return 0;
+        }
+      }
+
+      if (!$handled) {
+        print_error_and_usage(error => "unknown option '$option'") unless $silent;
+        return 0;
+      }
+
+      $argument_index++;
+    }
+
+    return 1;
+  }
+
+}
+
+# -----------------------------------------------------------------------------
+
+package UnifiedPS::UserDefinedOptions; {
+
+  sub new_instance {
+    # creates a new UserDefinedOptions instance
+    my ($class)= @_;
+    # --
+
+    # create new instance
+    my %map;
+    my $self= {
+      _map   => \%map,
+      _names => []
+    };
+    bless $self, $class;
+
+    # return new instance
+    return $self;	
+  }
+
+  sub add_option_definitions_from_file {
+    # reads option definitions from the given file
+    my ($self, %args)= @_;
+    # file              => name of the file with user-defined options
+    # --
+
+    my $description;
+    my $map= $self->{_map};
+    my $names= $self->{_names};
+    my $line= 0;
+    open(FILE, $args{file}) or return;
+    while(<FILE>) {
+      $line++;
+      if      ($_ =~ /^\s*$/) {
+        # empty line
+        $description= "";
+      } elsif ($_ =~ /^\s*#\s*(.*)$/) {
+        # description
+        $description.= $1 . " ";
+      } elsif ($_ =~ /^(-.*):=(.*)$/) {
+        # -option arg1 arg2 := --built-in-option xx ${arg1} yy ${arg2} zz
+        my @left= split(' ', $1);
+        my @right= split(' ', $2);
+        my $name= shift @left;
+        $map->{$name}= { arguments  => \@left,
+                         definition => \@right,
+                         description=> $description };
+        push(@$names, $name);
+        $description= "";
+      } else {
+        print "unifiedps: warning: failed to parse line $line of file '$args{file}'.\n";
+        $description= "";
+      }
+    }
+    close(FILE);
+  }
+
+  sub matches {
+    # returns whether this instances contains the given option
+    my ($self, %args)= @_;
+    # name              => name of the option
+    # --
+
+    my $name= $args{name};
+    my $value= $self->{_map}->{$name};
+    return defined($value);
+  }
+
+  sub definition {
+    # returns the definition array for the given option
+    my ($self, %args)= @_;
+    # name              => name of the option
+    # --
+
+    my $name= $args{name};
+    my $value= $self->{_map}->{$name};
+    return [] if !defined($value);
+
+    my $definition= $value->{definition};
+    return @$definition;
+  }
+
+  sub arguments {
+    # returns the arguments array for the given option
+    my ($self, %args)= @_;
+    # name              => name of the option
+    # --
+
+    my $name= $args{name};
+    my $value= $self->{_map}->{$name};
+    return [] if !defined($value);
+
+    my $definition= $value->{arguments};
+    return @$definition;
+  }
+
+  sub to_pod {
+    # transforms the user-defined options into pod format
+    my ($self)= @_;
+    # --
+    
+    my $map= $self->{_map};
+    my $names= $self->{_names};
+    
+    return undef if (!@$names);
+    
+    my $pod= "User-defined options currently configured in B<~/.unifiedpsrc>:\n\n"
+           . "=over 5\n\n";
+    
+    foreach my $name (@$names) {
+      # add option and arguments
+      $pod.= "=item B<$name> ";
+      my $arguments= $map->{$name}->{arguments};
+      foreach my $argument (@$arguments) {
+        $pod.= "I<$argument> ";
+      }
+      $pod.= "\n\n";
+      # add definition
+      $pod.= "=item ";
+      my $definition= $map->{$name}->{definition};
+      foreach my $component (@$definition) {
+        $component=~ s/\$\{(.*)\}/I<$1>/;
+        $pod.= "$component ";
+      }
+      $pod.= "\n\n";
+      # add description
+      my $description= $map->{$name}->{description};
+      $pod.= "$description\n\n";
+    }
+
+    $pod.= "=back\n";
+  }
+  
+}
+
+# -----------------------------------------------------------------------------
+
+package UnifiedPS::Process; {
+
+  sub new_instance {
+    # creates a new Process instances
+    my ($class, %args)= @_;
+    # pid               => process id
+    # ppid              => parent process id
+    # user              => name of user / user id
+    # terminal          => name of terminal
+    # time              => process time
+    # command           => process command line
+    # --
+
+    # create new instance with given values
+    my $self= {
+      _pid     => trim(text => $args{pid}),
+      _ppid    => trim(text => $args{ppid}),
+      _user    => trim(text => $args{user}),
+      _terminal=> trim(text => $args{terminal}),
+      _time    => trim(text => $args{time}),
+      _command => trim(text => $args{command}),
+      _parent  => undef,
+      _children=> undef,
+    };
+    bless $self, $class;
+    
+    # return new instance
+    return $self;	
+  }
+
+  sub trim {
+    # returns a trimmed version of the given text
+    my (%args)= @_;
+    # text              => the text to trim
+    # --
+
+    my $t= $args{text};
+    $t=~ s/^\s+// if defined($t);
+    $t=~ s/\s+$// if defined($t);
+    return $t;
+  }
+  
+  sub get_pid {
+    # returns the process id
+    my ($self)= @_;
+    # --
+
+    return $self->{_pid};
+  }
+
+  sub get_ppid {
+    # returns the parent's process id
+    my ($self)= @_;
+    # --
+
+    return $self->{_ppid};
+  }
+
+  sub get_user {
+    # returns the name of the user / user id
+    my ($self)= @_;
+    # --
+
+    return $self->{_user};
+  }
+
+  sub has_terminal {
+    # returns whether this process is connected to a terminal
+    my ($self)= @_;
+    # --
+
+    return defined($self->{_terminal});
+  }
+
+  sub get_terminal {
+    # returns the terminal to which this process is connected, returns "-"
+    # if the process is not connected to a terminal
+    my ($self)= @_;
+    # --
+
+    if (!defined($self->{_terminal})) {
+      return "-";
+    }
+    return $self->{_terminal};
+  }
+
+  sub get_time {
+    # returns the process' time
+    my ($self)= @_;
+    # --
+
+    return $self->{_time};
+  }
+
+  sub get_command {
+    # returns the process' command line
+    my ($self)= @_;
+    # --
+
+    return $self->{_command};
+  }
+  
+  sub set_command {
+    # sets the process' command line
+    my ($self, %args)= @_;
+    # value             => the command line to set
+    # --
+
+    $self->{_command}= $args{value};
+  }
+  
+  sub has_parent {
+    # returns whether this process has a parent process
+    my ($self)= @_;
+    # --
+
+    return defined($self->{_parent});
+  }
+
+  sub get_parent() {
+    # returns the process' parent process
+    my ($self)= @_;
+    # --
+
+    return $self->{_parent};
+  }
+
+  sub set_parent {
+    # sets the given process as this process' parent
+    my ($self, %args)= @_;
+    # parent            => parent process
+    # --
+
+    my $parent= $args{parent};
+    # set parent iff not self and parent's pid != 0
+    $self->{_parent}= $parent 
+      unless ($parent->get_pid() == $self->get_pid()) ||
+             ($parent->get_pid() eq "0");
+  }
+
+  sub is_child_of {
+    # returns whether this process is a child process (in any degree) of
+    # the given parent process
+    my ($self, %args)= @_;
+    # parent            => parent process
+    # --
+
+    my $parent= $args{parent};
+    # this process may be a root process in the process tree
+    return 0 if !$self->has_parent();
+    # the given parent process may be the direct parent
+    return 1 if $self->get_parent()->get_pid() eq $parent->get_pid();
+    # ask the parent process
+    return $self->get_parent()->is_child_of(parent => $parent);
+  }
+
+  sub has_children {
+    # returns whether this process has at least of child process
+    my ($self)= @_;
+    # --
+
+    return defined($self->{_children});
+  }
+  
+  sub add_child {
+    # adds the given child process
+    my ($self, %args)= @_;
+    # child             => child process
+    # --
+
+    my $child= $args{child};
+    # don't add me as a child of myself
+    return if $child->get_pid() == $self->get_pid();
+
+    # add the child process
+    $self->{_children}= () if !defined($self->{_children});
+    $self->{_children}{$child->get_pid()}= $child;
+
+    # set me as the child's parent process
+    $child->set_parent(parent => $self);
+  }
+
+  sub remove_children {
+    # removes all children of this process
+    my ($self)= @_;
+    # --
+
+    $self->{_children}= undef;
+  }
+
+  sub visit {
+    # visits this process with the given visitor instance
+    my ($self, %args)= @_;
+    # visitor           => the visitor
+    # --
+
+    my $visitor= $args{visitor};
+
+    # start visiting this process
+    $visitor->vi_visit_process_start(process => $self);
+
+    # visit all child processes
+    if (defined($self->{_children})) {
+      my $children= $self->{_children};
+      my @pids= $visitor->vi_get_sorted_pids(processes_by_pid => \%$children);
+      foreach my $pid (@pids) {
+        my $child= $children->{$pid};
+        $visitor->vi_visit_child_process(process => $child);
+      }
+    }
+
+    # end visiting this process
+    $visitor->vi_visit_process_end(process => $self);
+  }
+
+}
+
+# -----------------------------------------------------------------------------
+
+package UnifiedPS::NativePS; {
+
+  sub new_instance {
+    # creates a new NativePS instance
+    my ($class, %args)= @_;
+    # platform          => the platform to use, or 'auto-detect'
+    # --
+
+    my $platform= $args{platform};
+
+    # detect platform if requested
+    $platform= detect_platform() if $platform eq "auto-detect";
+    return undef if !$platform;
+
+    # create the templated instance
+    return $class->new_instance_from_template_by_name(name => $platform);
+  }
+  
+  sub detect_platform {
+    # detects the current platform
+    # --
+
+    my $uname= `uname -a 2>&1`;
+    $uname=~ s/[\r\n]//g if defined($uname);
+    if    ($uname =~ /Darwin/)  { return "darwin"; }
+    elsif ($uname =~ /AIX/)     { return "aix"; }
+    elsif ($uname =~ /FreeBSD/) { return "freebsd"; }
+    elsif ($uname =~ /HP\-UX/)  { return "hpux"; }
+    elsif ($uname =~ /Linux/)   { return "linux"; }
+    elsif ($uname =~ /OS400/)   { return "i5ospase"; }
+    elsif ($uname =~ /SunOS/)   { return "solaris"; }
+    else {
+      print "unifiedps: internal error: unknown platform '$uname'\n";
+      return undef; 
+    }
+  }
+
+  my %instance_templates=
+    # instance templates for all supported platforms
+    (
+    "bsd"     => # Mac OS X, Darwin, FreeBSD
+                 [ # ps command
+                   "ps -w -w -A -o ppid,pid,user,tty,time,command",
+                   # ps fields pattern
+                   '[ ]*(\S+)[ ]+(\S+)[ ]+(\S+)[ ]+(\S+)[ ]+(\S+)[ ]+(.*)',
+                   # ps fields
+                   [ "ppid", "pid" ,"user", "terminal", "time", "command" ],
+                   # no terminal pattern
+                   '^\?\?$',
+                 ],
+    "solaris" => # Solaris
+                 [ # ps command
+                   "ps -A -o ppid,pid,user,tty,time,args",
+                   # ps fields pattern
+                   '[ ]*(\S+)[ ]+(\S+)[ ]+(\S+)[ ]+(\S+)[ ]+(\S+)[ ]+(.*)',
+                   # ps fields
+                   [ "ppid", "pid" ,"user", "terminal", "time", "command" ],
+                   # no terminal pattern
+                   '^\?$',
+                 ],
+    "aix"     => # AIX, i5/OS PASE
+                 [ # ps command
+                   "ps -A -o ppid,pid,user,tt,time,args",
+                   # ps fields pattern
+                   '[ ]*(\S+)[ ]+(\S+)[ ]+(\S+)[ ]+(\S+)[ ]+(\S+)[ ]+(.*)',
+                   # ps fields
+                   [ "ppid", "pid" ,"user", "terminal", "time", "command" ],
+                   # no terminal pattern
+                   '^-$',
+                 ],
+    "hpux"    => # HP-UX
+                 [ # ps command
+                   "ps -e -f -x",
+                   # ps fields pattern
+                   '[ ]*(\S+)[ ]+(\S+)[ ]+(\S+)[ ]+\S+[ ].{8}[ ]+(\S+)[ ]+(\S+)[ ]+(.*)',
+                   # ps fields
+                   [ "user", "pid" ,"ppid", "terminal", "time", "command" ],
+                   # no terminal pattern
+                   '^\?$',
+                 ],
+    "linux"   => # Linux
+                 [ # ps command
+                   "ps -w -w -A -o ppid,pid,user,tt,time,command",
+                   # ps fields pattern
+                   '[ ]*(\S+)[ ]+(\S+)[ ]+(\S+)[ ]+(\S+)[ ]+(\S+)[ ]+(.*)',
+                   # ps fields
+                   [ "ppid", "pid" ,"user", "terminal", "time", "command" ],
+                   # no terminal pattern
+                   '^\?$',
+                 ],
+    );
+  
+  sub new_instance_from_template_by_name {
+    # creates a new NativePS instance from the given template name
+    my ($class, %args)= @_;
+    # name              => name of the template
+    # --
+
+    my $name= $args{name};
+    $name=~ s/[\r\n]//g;
+
+    if    ($name eq "darwin"  ||
+           $name eq "freebsd" ||
+           $name eq "macosx")   { $name= "bsd"; }
+    elsif ($name eq "i5ospase") { $name= "aix"; }
+
+    if (!$instance_templates{$name}) {
+      print "unifiedps: internal error: unsupported platform '$name'\n";
+      return undef; 
+    }
+
+    # create the new instance and fill it with the values from the template
+    my $self= {
+      _ps_command         => $instance_templates{$name}->[0],
+      _ps_fields_pattern  => $instance_templates{$name}->[1],
+      _ps_fields          => $instance_templates{$name}->[2],
+      _no_terminal_pattern=> $instance_templates{$name}->[3],
+    };
+    bless $self, $class;
+
+    # return the new instance
+    return $self;
+  }
+  
+  sub get_ps_command {
+    # returns the ps command
+    my ($self)= @_;
+    # --
+
+    return $self->{_ps_command};
+  }
+
+  sub get_ps_fields_pattern {
+    # returns the ps fields pattern
+    my ($self)= @_;
+    # --
+
+    return $self->{_ps_fields_pattern};
+  }
+
+  sub get_ps_fields {
+    # returns the ps fields
+    my ($self)= @_;
+    # --
+
+    return $self->{_ps_fields};
+  }
+
+  sub get_no_terminal_pattern {
+    # returns the no terminal pattern
+    my ($self)= @_;
+    # --
+
+    return $self->{_no_terminal_pattern};
+  }
+
+  sub get_all_processes_by_pid {
+    # retrieves all processes, turns them into a tree, and returns them as
+    # a hash indexed by the process' id
+    my ($self, %args)= @_;
+    # read_from_stdin   => read the processes from std-in
+    # --
+
+    my %processes_by_pid= ();
+    
+    # call the native ps commands to get the list of all processes    
+    my $ps_command= $self->get_ps_command();
+    my @raw_processes_as_list;
+    if (!$args{read_from_stdin}) {
+      @raw_processes_as_list= `$ps_command 2>&1`;
+    } else {
+      @raw_processes_as_list= <STDIN>;
+    }
+
+    # create a Process instance for each entry of the list
+    my $no_terminal_pattern= $self->get_no_terminal_pattern();
+    my $ps_fields_pattern= $self->get_ps_fields_pattern();
+    my $ps_fields= $self->get_ps_fields();
+    my $raw_process_index= 1;
+    while ($raw_process_index < @raw_processes_as_list) {
+      my $raw_process= $raw_processes_as_list[$raw_process_index++];
+      my %fields=();
+      
+      if ($raw_process =~ /$ps_fields_pattern/) {
+        # extract the entry's fields
+        $fields{$ps_fields->[0]}= $1;
+        $fields{$ps_fields->[1]}= $2;
+        $fields{$ps_fields->[2]}= $3;
+        $fields{$ps_fields->[3]}= $4;
+        $fields{$ps_fields->[4]}= $5;
+        $fields{$ps_fields->[5]}= $6;
+        
+        if ($fields{pid} =~ /^[0-9]+$/ && 
+            $fields{ppid} =~ /^[0-9]+$/) {
+          # undef the terminal field if there is no controlling terminal
+          $fields{terminal}= undef 
+            if (defined($fields{terminal}) && 
+                $fields{terminal} =~ /$no_terminal_pattern/);
+
+          # now, create a Process instance from the fields
+          my $process= UnifiedPS::Process->new_instance(%fields);
+          $processes_by_pid{$process->get_pid()}= $process;
+        }
+      }
+    }
+    
+    # turn the list of Process instances into a tree
+    my $pid;
+    my $process;
+    while (($pid, $process)= each %processes_by_pid) {
+      my $parent_process= $processes_by_pid{$process->get_ppid()};
+      $parent_process->add_child(child => $process) if defined($parent_process);
+    };
+
+    # manipulate the information about this process   
+    my $self_pid= getpgrp(0);
+    my $self_process= $processes_by_pid{$self_pid};
+    if ($self_process) {
+      # remove all processes which are children of this process
+      while (($pid, $process)= each %processes_by_pid) {
+        delete $processes_by_pid{$pid} if $process->is_child_of(parent => $self_process);
+      }
+      $self_process->remove_children();
+    
+      # override this process's command line and hide everything except the
+      # program name and arguments
+      $self_process->set_command(value => "unifiedps " . join(" ", @ARGV));
+    }
+    
+    # return the Process instances
+    return %processes_by_pid;
+  }
+
+}
+
+# -----------------------------------------------------------------------------
+
+package UnifiedPS::ProcessFilter; {
+
+  sub new_instance {
+    # creates a new ProcessFilter instance
+    my ($class)= @_;
+    # --
+
+    # create new instance
+    my $self= {};
+    bless $self, $class;
+
+    # return new instance
+    return $self;	
+  }
+
+  sub configure {
+    my ($self, %args)= @_;
+    # [command]         => an array with command strings
+    # [pid]             => an array with process ids
+    # [terminal]        => an array with terminal names
+    # [user]            => an array with user names
+    # [default]         => the default return value for accepts calls
+    # --
+
+    $self->{_command}= [];
+    $self->{_pid}= [];
+    $self->{_terminal}= [];
+    $self->{_user}= [];
+
+    # process arguments
+    my $argument;
+
+    $argument= $args{command};
+    $self->{_command}=$argument if defined($argument);
+
+    $argument= $args{pid};
+    $self->{_pid}=$argument if defined($argument);
+
+    $argument= $args{terminal};
+    $self->{_terminal}=$argument if defined($argument);
+
+    $argument= $args{user};
+    $self->{_user}=$argument if defined($argument);
+
+    $argument= $args{default};
+    $self->{_default}= defined($argument) ? $argument : 0;
+  }
+
+  sub accepts {
+    my ($self, %args)= @_;
+    # process           => the Process instance to test
+    # --
+
+    my $process= $args{process};
+    my $accepted= $self->{_default};
+
+    my $matchers;
+    my $matcher;
+    my $value;
+
+    $matchers= $self->{_command};
+    $value= $process->get_command();
+    foreach $matcher (@$matchers) {
+      return 0 unless $matcher->matches($value);
+      $accepted= 1;
+    }
+
+    $matchers= $self->{_pid};
+    $value= $process->get_pid();
+    foreach $matcher (@$matchers) {
+      return 0 unless $matcher->matches($value);
+      $accepted= 1;
+    }
+
+    $matchers= $self->{_terminal};
+    $value= $process->has_terminal() ? $process->get_terminal() : "no-tty";
+    foreach $matcher (@$matchers) {
+      return 0 unless $matcher->matches($value);
+      $accepted= 1;
+    }
+
+    $matchers= $self->{_user};
+    $value= $process->get_user();
+    foreach $matcher (@$matchers) {
+      return 0 unless $matcher->matches($value);
+      $accepted= 1;
+    }
+
+    return $accepted;
+  }
+
+}
+
+# -----------------------------------------------------------------------------
+
+package UnifiedPS::ProcessPrinter; {
+
+  sub new_instance {
+    # creates a new ProcessPrinter instance
+    my ($class)= @_;
+    # --
+
+    # create the new instance and configure it with defaults
+    my $self= {};
+    bless $self, $class;
+    $self->configure();
+
+    # return the new instance
+    return $self;
+  }
+
+  my $display_format_tree= "tree";
+  my $display_format_list= "list";
+
+  my $sorting_order_pid_asc= "pid asc";
+
+  sub configure {
+    # (re)configures this instance
+    my ($self, %args)= @_;
+    # [display_format]  => display format to use
+    # [display_indent_pid] => whether to indent the pid field
+    # [display_indent_command] => whether to indent the command field
+    # [display_header]  => whether to display the header line
+    # [display_width]   => display width to use
+    # [sorting_order]   => sorting order to use
+    # [mark_filter]     => the mark filter to use
+    # [restrict_filter] => the restrict filter to use
+    # [show_all_child_processes] => whether to show all child processes
+    # [show_all_parent_processes] => whether to show all parent processes
+    # --
+
+    # set defaults
+    $self->{_display_format}= $display_format_tree;
+    $self->{_display_width}= 80;
+    $self->{_display_header}= 1;
+    $self->{_sorting_order}= $sorting_order_pid_asc;
+    $self->{_mark_filter}= undef;
+    $self->{_restrict_filter}= undef;
+    $self->{_show_all_child_processes}= 0;
+    $self->{_show_all_parent_processes}= 0;
+    $self->{_field_indentation}= [ 0,  # pid
+                                   0,  # ppid
+                                   0,  # user
+                                   0,  # tty
+                                   0,  # time
+                                   0   # command
+                                 ];
+
+    $self->{_visit_all_child_processes}= 0;
+    $self->{_visit_all_parent_processes}= 0;
+    $self->{_is_configure_step}= 0;
+    $self->{_current_depth}= 0;
+    $self->{_current_indentation}= 0;
+    $self->{_max_field_sizes}= undef;
+
+    $self->{_processes_to_visit}= undef;
+    $self->{_processes_to_show}= undef;
+
+    # process arguments
+    my $arg;
+
+    $arg= $args{display_format};
+    if ($arg && ($arg eq $display_format_tree || 
+                 $arg eq $display_format_list)) {
+      $self->{_display_format}= $arg;
+    }
+
+    $arg= $args{display_indent_pid};
+    $self->{_field_indentation}->[0]= $arg if defined($arg);
+
+    $arg= $args{display_indent_command};
+    $self->{_field_indentation}->[5]= $arg if defined($arg);
+
+    $arg= $args{display_header};
+    $self->{_display_header}= $arg if defined($arg);
+
+    $arg= $args{display_width};
+    if ($arg && ($arg == -1 || 
+                 $arg =~ /^[0-9]+$/)) {
+      $self->{_display_width}= $arg-0;
+    }
+
+    $arg= $args{sorting_order};
+    if ($arg && ($arg eq $sorting_order_pid_asc)) {
+      $self->{_sorting_order}= $arg;
+    }
+
+    $arg= $args{mark_filter};
+    $self->{_mark_filter}= $arg if defined($arg);
+
+    $arg= $args{restrict_filter};
+    $self->{_restrict_filter}= $arg if defined($arg);
+
+    $arg= $args{show_all_child_processes};
+    $self->{_show_all_child_processes}= $arg if defined($arg);
+
+    $arg= $args{show_all_parent_processes};
+    $self->{_show_all_parent_processes}= $arg if defined($arg);
+
+    $self->{_visit_all_child_processes}= 1 if $self->{_show_all_child_processes} ||
+                                              $self->{_display_format} eq $display_format_tree;
+
+    $self->{_visit_all_parent_processes}= 1 if $self->{_show_all_parent_processes} ||
+                                               $self->{_display_format} eq $display_format_tree;
+  }
+
+  sub update_max_field_size {
+    # updates the max field size for the given field
+    my ($self, %args)= @_;
+    # field             => the name of the field to update
+    # size              => the size of the field
+    # --
+
+    my $field= $args{field};
+    my $size= $args{size};
+
+    # get the current max field size
+    my $max_size= $self->{_max_field_sizes}[$field];
+    # update the max field size if the new size is greater or no size exists
+    $self->{_max_field_sizes}[$field]= $size if (!defined($max_size) ||
+                                                 $max_size < $size);
+  }
+
+  sub get_max_field_size {
+    # returns the max field size of the given field, or 0
+    my ($self, %args)= @_;
+    # field             => the name of the field
+    # --
+
+    my $field= $args{field};
+    my $size= $self->{_max_field_sizes}[$field];
+    return defined($size) ? $size : 0;
+  }
+
+  sub print_processes {
+    # prints the given processes
+    my ($self, %args)= @_;
+    # processes_by_pid  => a reference to the processes to print
+    # --
+
+    # (re)initialize some fields for this iteration
+    $self->{_max_field_sizes}= [];
+    $self->{_processes_to_visit}= {};
+    $self->{_processes_to_show}= {};
+
+    # get the processes and sort the pids
+    my $processes_by_pid= $args{processes_by_pid};
+    my @pids= $self->vi_get_sorted_pids(processes_by_pid => \%$processes_by_pid);
+
+    # create a fake process which contains the header fields
+    my $header_process= UnifiedPS::Process->new_instance(ppid => "PPID",
+                                                         pid => "PID",
+                                                         user => "USER",
+                                                         terminal => "TTY",
+                                                         time => "TIME",
+                                                         command => "COMMAND");
+
+    # add all processes to visit to _processes_to_visit and all processes
+    # to show to _processes_to_show
+    my $show_all_child_processes  = $self->{_show_all_child_processes};
+    my $show_all_parent_processes = $self->{_show_all_parent_processes};
+    my $visit_all_child_processes = $self->{_visit_all_child_processes};
+    my $visit_all_parent_processes= $self->{_visit_all_parent_processes};
+    foreach my $pid (@pids) {
+      my $process= $processes_by_pid->{$pid};
+      if (!$self->{_restrict_filter} ||
+          $self->{_restrict_filter}->accepts(process => $process)) {
+        $self->{_processes_to_visit}{$process}= 1;
+        $self->{_processes_to_show}{$process}= 1;
+
+        # consider all parents 
+        if ($visit_all_parent_processes) {
+          my $parent= $process->get_parent();
+          while ($parent) {
+            $self->{_processes_to_visit}{$parent}= 1;
+            $self->{_processes_to_show}{$parent}= 1 if $show_all_parent_processes;
+            $parent= $parent->get_parent();
+          }
+        }
+
+        # consider all children
+        if ($visit_all_child_processes) {
+          foreach my $childpid (@pids) {
+            my $childprocess= $processes_by_pid->{$childpid};
+            if ($childprocess->is_child_of(parent => $process)) {
+              $self->{_processes_to_visit}{$childprocess}= 1;
+              $self->{_processes_to_show}{$childprocess}= 1 if $show_all_child_processes;
+            }
+          }
+        }
+        
+      }
+    }
+
+    # also add the fake header process
+    $self->{_processes_to_visit}{$header_process}= 1 if $self->{_display_header};
+    $self->{_processes_to_show}{$header_process}= 1  if $self->{_display_header};
+
+    # start two iterations over the processes, the first iteration is a
+    # configure step which collects max field sizes etc., the second one does
+    # the printing
+    for (my $iteration = 0; $iteration <= 1; $iteration++) {
+      $self->{_is_configure_step}= ($iteration == 0);
+      $self->{_current_depth}= 0;
+      # visit the fake header process
+      $header_process->visit(visitor => $self);
+      # visit all processes
+      foreach my $pid (@pids) {
+        my $process= $processes_by_pid->{$pid};
+        $process->visit(visitor => $self)
+          if $self->visit_process_at_current_depth(process => $process);
+      }
+    }
+  }
+
+  sub visit_process_at_current_depth {
+    # returns 1 if we have to visit the given process at the current depth,
+    # or 0 otherwise
+    my ($self, %args)= @_;
+    # process           => the process to visit
+    # --
+
+    my $process= $args{process};
+
+    # check processes to visit
+    return 0 if !$self->{_processes_to_visit}{$process};
+    
+    # check the display format
+    my $depth= $self->{_current_depth};
+    if      ($self->{_display_format} eq $display_format_list) {
+      # visit only at depth 0
+      return $depth == 0;
+    } elsif ($self->{_display_format} eq $display_format_tree) {
+      # visit root processes only at depth 0 and all other processes
+      # at any depth != 0
+      return $depth == 0 if (!$process->has_parent());
+      return $depth != 0;
+    }
+    print "unifiedps: internal error: unsupported display format";
+    exit;
+  }
+
+  sub vi_visit_process_start {
+    # starts visiting the process
+    my ($self, %args)= @_;
+    # process           => the process being visited
+    # --
+
+    $self->{_current_depth}= $self->{_current_depth} + 1;
+
+    my $process= $args{process};
+    return unless $self->{_processes_to_show}{$process};
+
+    my $indentation= $self->{_current_indentation};
+    my $columns= [ $process->get_pid(),       # 0
+                   $process->get_ppid(),      # 1
+                   $process->get_user(),      # 2
+                   $process->get_terminal(),  # 3
+                   $process->get_time(),      # 4
+                   $process->get_command()    # 5
+                 ];
+
+    my $field= 0;
+    if ($self->{_is_configure_step}) {
+      foreach my $element (@$columns) {
+        my $size= length($element);
+        $size+= $indentation * $self->{_field_indentation}->[$field];
+        $self->update_max_field_size(field => $field, size => $size);
+        $field++;
+      }
+    } else {
+      my $line= " ";
+
+      # mark the process
+      $line= ":" if !($columns->[0] eq "PID") &&
+                    $self->{_mark_filter} && 
+                    $self->{_mark_filter}->accepts(process => $process);
+
+      # add the fields
+      foreach my $element (@$columns) {
+        my $indent= $indentation * $self->{_field_indentation}->[$field];
+        my $size= $self->get_max_field_size(field => $field) - $indent;
+        $size+= 1 if ($field < 4);
+        my $alignment= ($field == 4) ? "" : "-";
+        $line.= sprintf("%-${indent}s%${alignment}${size}s ", "", $element);
+        $field++;
+      }
+      
+      # remove trailing whitespaces
+      $line=~ s/\s+$//;
+
+      # print the line
+      if ($self->{_display_width} == -1) {
+        print $line . "\n";
+      } else {
+        print substr($line, 0, $self->{_display_width}) . "\n";
+      }
+    }
+
+    $self->{_current_indentation}= $self->{_current_indentation} + 1;
+  }
+  
+  sub vi_visit_process_end {
+    # ends visiting the process
+    my ($self, %args)= @_;
+    # process           => the process being visited
+    # --
+
+    $self->{_current_depth}= $self->{_current_depth} - 1;    
+
+    my $process= $args{process};
+    return unless $self->{_processes_to_show}{$process};
+
+    $self->{_current_indentation}= $self->{_current_indentation} - 1;
+  }
+ 
+  sub vi_visit_child_process {
+    # visits a child process
+    my ($self, %args)= @_;
+    # process           => the process being visited
+    # --
+
+    my $process= $args{process};
+    $process->visit(visitor => $self)
+      if $self->visit_process_at_current_depth(process => $process);
+  }
+  
+  sub vi_get_sorted_pids {
+    # returns the pids sorted by the current sorting order
+    my ($self, %args)= @_;
+    # --
+
+    my $processes_by_pid= $args{processes_by_pid};
+    my @pids;
+    if ($self->{_sorting_order} eq $sorting_order_pid_asc) {
+      return sort { $a <=> $b } keys %$processes_by_pid;
+    }
+    print "unifiedps: internal error: unsupported sorting order";
+    exit;
+  }
+
+}
+
+# -----------------------------------------------------------------------------
+
+package UnifiedPS; {
+
+  sub main {
+    # initialize options
+    my $userdefoptions= UnifiedPS::UserDefinedOptions->new_instance();
+    $userdefoptions->add_option_definitions_from_file(file => "$ENV{HOME}/.unifiedpsrc");
+
+    my $options= UnifiedPS::Options->new_instance();
+    return if !$options;
+    return if !$options->process_arguments(arguments => \@ARGV,
+                                           userdefoptions => $userdefoptions);
+
+    # get the wrapper for the native ps command
+    my $nativeps= UnifiedPS::NativePS->new_instance(platform => $options->get_platform());
+    return if !$nativeps;
+    # get all processes
+    my %processes_by_pid= $nativeps->get_all_processes_by_pid(read_from_stdin => $options->get_stdin());
+
+    # print the processes
+    my $printer= UnifiedPS::ProcessPrinter->new_instance();
+    my $mark_filter= UnifiedPS::ProcessFilter->new_instance();
+    $mark_filter->configure(command => $options->get_mark_command(),
+                            pid => $options->get_mark_pid(),
+                            terminal => $options->get_mark_tty(),
+                            user => $options->get_mark_user(),
+                            default => 0);
+    my $restrict_filter= UnifiedPS::ProcessFilter->new_instance();
+    $restrict_filter->configure(command => $options->get_restrict_command(),
+                            pid => $options->get_restrict_pid(),
+                            terminal => $options->get_restrict_tty(),
+                            user => $options->get_restrict_user(),
+                            default => 1);
+    
+    $printer->configure(display_format => $options->get_display_format(),
+                        display_indent_pid => $options->get_display_indent_pid(),
+                        display_indent_command => $options->get_display_indent_command(),
+                        display_header => $options->get_display_header(),
+                        display_width => $options->get_display_width(),
+                        mark_filter => $mark_filter,
+                        restrict_filter => $restrict_filter,
+                        show_all_child_processes => $options->get_include_children(),
+                        show_all_parent_processes => $options->get_include_parents());
+    $printer->print_processes(processes_by_pid => \%processes_by_pid);
+  }
+
+}
+
+# -----------------------------------------------------------------------------
+
+# call main and end
+UnifiedPS::main();
