@@ -41,6 +41,12 @@
 # Includes all parent and child processes
 -AA := --no-restrict user --no-restrict tty --include parents --include children
 
+# Displays information about the processes of all users, even those which are
+# not connected to a controlling terminal, but not those which
+# belong to root, nobody, daemon, and those users starting with a '_'.
+# Includes all parent and child processes
+-AAx := --no-restrict user --no-restrict tty --include parents --include children --restrict user neq root --restrict user neq nobody --restrict user neq daemon --restrict user nst _
+
 # Displays information about the processes of all users, but not those which
 # belong to root, nobody, daemon, and those users starting with a '_'.
 -ax := --no-restrict user --restrict user neq root --restrict user neq nobody --restrict user neq daemon --restrict user nst _
