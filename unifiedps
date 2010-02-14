@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 #
-# unifiedps -- unified process status
+# unifiedps -- a unified, cross-platform process status
 #
 # Copyright 2005-2010 by Arne Harren <ah@0xc0.de>.
 #
@@ -41,7 +41,7 @@ my $unifiedps_pod= <<END;
 
 =head1 NAME
 
-B<unifiedps> -- unified process status
+B<unifiedps> -- a unified, cross-platform process status
 
 =head1 SYNOPSIS
 
@@ -80,7 +80,7 @@ B<unifiedps> [B<->I<user-defined-option> [I<argument1> [I<argument2> ...]]]
 =head1 DESCRIPTION
 
 B<Unifiedps> displays information about running processes by wrapping and 
-decorating the platform's native B<ps> command in an unified way across 
+decorating the platform's native B<ps> command in a unified way across
 different platforms, e.g. Mac OS X/Darwin, Linux, AIX, and HP-UX.
 
 As B<unifiedps> supports multiple platforms, it displays only a selection of
