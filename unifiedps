@@ -324,7 +324,7 @@ package UnifiedPS::Matchers::Equals; {
     };
     bless $self, $class;
 
-    return $self;	
+    return $self;
   }
 
   sub matches {
@@ -346,7 +346,7 @@ package UnifiedPS::Matchers::Contains; {
     };
     bless $self, $class;
 
-    return $self;	
+    return $self;
   }
 
   sub matches {
@@ -368,7 +368,7 @@ package UnifiedPS::Matchers::Starts; {
     };
     bless $self, $class;
 
-    return $self;	
+    return $self;
   }
 
   sub matches {
@@ -390,7 +390,7 @@ package UnifiedPS::Matchers::Ends; {
     };
     bless $self, $class;
 
-    return $self;	
+    return $self;
   }
 
   sub matches {
@@ -411,7 +411,7 @@ package UnifiedPS::Matchers::Not; {
       _matcher => $matcher
     };
     bless $self, $class;
-    return $self;	
+    return $self;
   }
 
   sub matches {
@@ -433,7 +433,7 @@ package UnifiedPS::Matchers::Or; {
       _matcher2 => $matcher2
     };
     bless $self, $class;
-    return $self;	
+    return $self;
   }
 
   sub matches {
@@ -456,7 +456,7 @@ package UnifiedPS::Matchers::And; {
       _matcher2 => $matcher2
     };
     bless $self, $class;
-    return $self;	
+    return $self;
   }
 
   sub matches {
@@ -536,54 +536,54 @@ package UnifiedPS::Options; {
     $self->set_defaults();
 
     # return new instance
-    return $self;	
+    return $self;
   }
 
-  my $option_display_format						= "--display-format";
-  my $option_display_indent 					= "--display-indent";
-  my $option_no_display_indent 				= "--no-display-indent";
-  my $option_display_header 					= "--display-header";
-  my $option_no_display_header 				= "--no-display-header";
-  my $option_display_width  					= "--display-width";
-  my $option_mark           					= "--mark";
-  my $option_no_mark        					= "--no-mark";
-  my $option_restrict       					= "--restrict";
-  my $option_no_restrict    					= "--no-restrict";
-  my $option_include        					= "--include";
-  my $option_no_include     					= "--no-include";
-  my $option_platform       					= "--platform";
-  my $option_stdin          					= "--stdin";
-  my $option_version        					= "--version";
-  my $option_help           					= "--help";
+  my $option_display_format           = "--display-format";
+  my $option_display_indent           = "--display-indent";
+  my $option_no_display_indent        = "--no-display-indent";
+  my $option_display_header           = "--display-header";
+  my $option_no_display_header        = "--no-display-header";
+  my $option_display_width            = "--display-width";
+  my $option_mark                     = "--mark";
+  my $option_no_mark                  = "--no-mark";
+  my $option_restrict                 = "--restrict";
+  my $option_no_restrict              = "--no-restrict";
+  my $option_include                  = "--include";
+  my $option_no_include               = "--no-include";
+  my $option_platform                 = "--platform";
+  my $option_stdin                    = "--stdin";
+  my $option_version                  = "--version";
+  my $option_help                     = "--help";
 
-  my $display_format_tree   					= "tree";
-  my $display_format_list   					= "list";
+  my $display_format_tree             = "tree";
+  my $display_format_list             = "list";
 
-  my $field_command         					= "command";
-  my $field_pid             					= "pid";
-  my $field_tty             					= "tty";
-  my $field_user            					= "user";
-  my $field_all             					= "all";
+  my $field_command                   = "command";
+  my $field_pid                       = "pid";
+  my $field_tty                       = "tty";
+  my $field_user                      = "user";
+  my $field_all                       = "all";
 
-  my $value_no_tty          					= "no-tty";
+  my $value_no_tty                    = "no-tty";
 
-  my $operator_equals       					= [ "eq"  , "equals"    ];
-  my $operator_not_equals   					= [ "neq" , "nequals"   ];
-  my $operator_contains     					= [ "co"  , "contains"  ];
-  my $operator_not_contains 					= [ "nco" , "ncontains" ];
-  my $operator_is           					= [ "is"  , "is"        ];
-  my $operator_not_is       					= [ "nis" , "nis"       ];
-  my $operator_starts       					= [ "st"  , "starts"    ];
-  my $operator_not_starts   					= [ "nst" , "nstarts"   ];
-  my $operator_ends         					= [ "en"  , "ends"      ];
-  my $operator_not_ends     					= [ "nen" , "nends"     ];
-  my $operator_or           					= [ "or"  , "or"        ];
+  my $operator_equals                 = [ "eq"  , "equals"    ];
+  my $operator_not_equals             = [ "neq" , "nequals"   ];
+  my $operator_contains               = [ "co"  , "contains"  ];
+  my $operator_not_contains           = [ "nco" , "ncontains" ];
+  my $operator_is                     = [ "is"  , "is"        ];
+  my $operator_not_is                 = [ "nis" , "nis"       ];
+  my $operator_starts                 = [ "st"  , "starts"    ];
+  my $operator_not_starts             = [ "nst" , "nstarts"   ];
+  my $operator_ends                   = [ "en"  , "ends"      ];
+  my $operator_not_ends               = [ "nen" , "nends"     ];
+  my $operator_or                     = [ "or"  , "or"        ];
 
-  my $relation_parents      					= "parents";
-  my $relation_children     					= "children";
-  my $relation_all          					= "all";
+  my $relation_parents                = "parents";
+  my $relation_children               = "children";
+  my $relation_all                    = "all";
 
-  my $error_value           					= "__error__";
+  my $error_value                     = "__error__";
 
   sub operator {
     my (%args)= @_;
@@ -629,8 +629,8 @@ package UnifiedPS::Options; {
     $self->{_display_indent_pid}= 1;
     $self->{_display_indent_command}= 2;
 
-		# display header
-		$self->{_display_header}= 1;
+    # display header
+    $self->{_display_header}= 1;
 
     # includes
     $self->{_include_parents}= 0;
@@ -1182,7 +1182,7 @@ package UnifiedPS::UserDefinedOptions; {
     bless $self, $class;
 
     # return new instance
-    return $self;	
+    return $self;
   }
 
   sub add_option_definitions_from_file {
@@ -1329,7 +1329,7 @@ package UnifiedPS::Process; {
     bless $self, $class;
     
     # return new instance
-    return $self;	
+    return $self;
   }
 
   sub trim {
@@ -1770,7 +1770,7 @@ package UnifiedPS::ProcessFilter; {
     bless $self, $class;
 
     # return new instance
-    return $self;	
+    return $self;
   }
 
   sub configure {
